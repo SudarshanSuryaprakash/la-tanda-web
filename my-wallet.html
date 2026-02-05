@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Cartera - La Tanda</title>
+    <link rel="stylesheet" href="my-wallet.css">
+</head>
+<body>
+    <div class="wallet-container">
+        <div class="wallet-header">
+            <h1>💼 Mi Cartera</h1>
+            <div class="balance-section">
+                <div class="balance-card">
+                    <span class="balance-label">Saldo Disponible</span>
+                    <span class="balance-amount" id="availableBalance">L. 0.00</span>
+                </div>
+                <div class="balance-card">
+                    <span class="balance-label">Moneda</span>
+                    <span class="balance-currency" id="currencyDisplay">HNL</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="transactions-section">
+            <div class="section-header">
+                <h2>Historial de Transacciones</h2>
+                <div class="filter-controls">
+                    <select id="statusFilter" class="filter-select">
+                        <option value="">Todas las transacciones</option>
+                        <option value="completed">Completadas</option>
+                        <option value="pending">Pendientes</option>
+                        <option value="failed">Fallidas</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div id="loadingIndicator" class="loading-indicator hidden">
+                <div class="spinner"></div>
+                <p>Cargando transacciones...</p>
+            </div>
+
+            <!-- Transactions list -->
+            <div id="transactionsList" class="transactions-list">
+                <!-- Populated by JavaScript -->
+            </div>
+
+            <!-- No transactions message -->
+            <div id="noTransactionsMessage" class="no-transactions hidden">
+                <p>No hay transacciones disponibles</p>
+            </div>
+
+            <!-- Pagination controls -->
+            <div id="paginationControls" class="pagination-controls">
+                <div class="pagination-info">
+                    <span id="pageIndicator">Página 0 de 0</span>
+                    <span id="transactionCount">0 transacciones</span>
+                </div>
+                
+                <div class="pagination-buttons">
+                    <button id="prevBtn" class="pagination-btn" disabled>← Anterior</button>
+                    
+                    <div class="page-jump">
+                        <input type="number" id="pageJumpInput" class="page-jump-input" min="1" placeholder="Ir a página..." />
+                        <button id="pageJumpBtn" class="page-jump-btn">Ir</button>
+                    </div>
+                    
+                    <button id="nextBtn" class="pagination-btn" disabled>Siguiente →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="my-wallet.js"></script>
+</body>
+</html>

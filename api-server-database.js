@@ -3436,10 +3436,15 @@ app.get('/api/contributions/overdue', authenticateToken, requireRole(['administr
 
 // Get user transactions (wallet endpoint)
 app.post('/api/user/transactions', authenticateToken, [
-    body('user_id').optional().isString().withMessage('Valid user ID required')
+    body('user_id').optional().isString().withMessage('Valid user ID required'),
+    body('page').optional().isInt({ min: 1 }).withMessage('Page must be >= 1'),
+    body('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
 ], handleValidationErrors, async (req, res) => {
     try {
-        const { user_id, status_filter, limit = 20, offset = 0 } = req.body;
+        const { user_id, status_filter, page = 1, limit = 20 } = req.body;
+        
+        // Convert page to offset (page 1 = offset 0)
+        const offset = (page - 1) * limit;
 
         // Use authenticated user if no user_id provided
         const targetUserId = user_id || req.user.id;
@@ -3475,8 +3480,8 @@ app.post('/api/user/transactions', authenticateToken, [
         const balance = walletResult.rows.length > 0 ? walletResult.rows[0].balance : '0.00';
         const currency = walletResult.rows.length > 0 ? walletResult.rows[0].currency : 'HNL';
 
-        // Get transactions from multiple sources
-        let query = `
+        // Build base query for counting total transactions
+        let baseQuery = `
             SELECT
                 'contribution' as type,
                 c.id::text as id,
@@ -3509,17 +3514,32 @@ app.post('/api/user/transactions', authenticateToken, [
             WHERE t.user_id = $1
         `;
 
-        const params = [targetUserId];
+        let countQuery = `SELECT COUNT(*) as total FROM (${baseQuery}) as all_transactions`;
+        let dataQuery = baseQuery;
 
+        const countParams = [targetUserId];
+        const dataParams = [targetUserId];
+
+        // Apply status filter if provided
         if (status_filter) {
-            query += ` AND status = $${params.length + 1}`;
-            params.push(status_filter);
+            countQuery = countQuery.replace('FROM (', `FROM (${baseQuery}`).replace(/\$1/g, () => {
+                countParams.push(status_filter);
+                return `$${countParams.length}`;
+            });
+            dataQuery += ` WHERE status = $${dataParams.length + 1}`;
+            dataParams.push(status_filter);
         }
 
-        query += ` ORDER BY date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-        params.push(limit, offset);
+        // Get total count
+        const countResult = await db.query(countQuery, countParams);
+        const totalCount = parseInt(countResult.rows[0].total, 10);
+        const totalPages = Math.ceil(totalCount / limit);
 
-        const result = await db.query(query, params);
+        // Get paginated data
+        dataQuery += ` ORDER BY date DESC LIMIT $${dataParams.length + 1} OFFSET $${dataParams.length + 2}`;
+        dataParams.push(limit, offset);
+
+        const result = await db.query(dataQuery, dataParams);
 
         // Format transactions for wallet
         const transactions = result.rows.map(tx => ({
@@ -3533,9 +3553,13 @@ app.post('/api/user/transactions', authenticateToken, [
             group_name: tx.group_name
         }));
 
-        logger.info('User transactions retrieved', {
+        logger.info('User transactions retrieved with pagination', {
             user_id: targetUserId,
+            page: page,
+            limit: limit,
             count: transactions.length,
+            total_count: totalCount,
+            total_pages: totalPages,
             balance: balance
         });
 
@@ -3546,9 +3570,15 @@ app.post('/api/user/transactions', authenticateToken, [
                 balance: balance,
                 currency: currency,
                 transactions: transactions,
-                count: transactions.length,
-                limit: limit,
-                offset: offset
+                pagination: {
+                    current_page: page,
+                    limit: limit,
+                    total_count: totalCount,
+                    total_pages: totalPages,
+                    has_next: page < totalPages,
+                    has_prev: page > 1,
+                    offset: offset
+                }
             },
             meta: {
                 timestamp: new Date().toISOString()
